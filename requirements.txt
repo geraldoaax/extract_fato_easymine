@@ -1,0 +1,5 @@
+pyodbc
+python-dotenv
+pandas
+openpyxl
+pyyaml

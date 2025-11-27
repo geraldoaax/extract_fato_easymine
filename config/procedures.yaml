@@ -1,0 +1,23 @@
+procedures:
+  - name: fato.prQDataCicloDetalhado
+    output_folder: ciclo_detalhado
+    params:
+      - name: DataInicial
+        type: datetime
+        position: 1
+      - name: DataFinal
+        type: datetime
+        position: 2
+  - name: fato.outra_procedure
+    output_folder: outra_procedure
+    params:
+      - name: data_inicial
+        type: datetime
+        position: 1
+      - name: data_final
+        type: datetime
+        position: 2
+      - name: id_empresa
+        type: int
+        position: 3
+        default: 1
