@@ -12,6 +12,8 @@ procedures:
         position: 2
   - name: fato.prQDataCicloDetalhadoLatLon
     output_folder: ciclo_detalhado_latlon
+    table: fato.CicloDetalhadoLatLon
+    date_column: datahorainicio
     params:
       - name: dataInicial
         type: datetime
