@@ -205,9 +205,24 @@ class ProcedureExecutor:
             # Prepara os parâmetros para este período
             params = self._prepare_params(procedure_config, period_start, period_end, extra_params)
 
+            # Ajusta horário inicial/final conforme padrão: 00:00:00 e 23:59:59
+            period_start_dt = period_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            period_end_dt = period_end.replace(hour=23, minute=59, second=59, microsecond=0)
+
             try:
-                # Executa a procedure
-                df = self.db_connection.execute_procedure(procedure_name, params)
+                # Se for um objeto no schema 'fato', trocar execução de procedure por SELECT
+                schema = procedure_name.split(".")[0] if "." in procedure_name else ""
+                if schema.lower() == "fato":
+                    # Permite configurar nome da tabela ou coluna de data na configuração
+                    table_name = procedure_config.get("table", procedure_name)
+                    date_column = procedure_config.get("date_column", "Data")
+
+                    df = self.db_connection.execute_select(
+                        table_name, period_start_dt, period_end_dt, date_column=date_column
+                    )
+                else:
+                    # Executa a procedure (comportamento legado)
+                    df = self.db_connection.execute_procedure(procedure_name, params)
 
                 if df.empty:
                     logger.info(f"  Nenhum dado retornado para este período")

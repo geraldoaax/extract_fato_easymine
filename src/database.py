@@ -190,3 +190,77 @@ class DatabaseConnection:
                 return True
         except:
             return False
+
+    def execute_select(self, table_name: str, start_dt: datetime, end_dt: datetime, date_column: str = "Data") -> pd.DataFrame:
+        """
+        Executa um SELECT simples na tabela informada filtrando entre duas datas.
+
+        Args:
+            table_name: Nome da tabela (pode ser schema.tabela)
+            start_dt: Data/hora inicial
+            end_dt: Data/hora final
+            date_column: Nome da coluna de data a ser usada no WHERE
+
+        Returns:
+            DataFrame com os resultados
+        """
+        if not table_name:
+            raise ValueError("Nome da tabela é obrigatório para SELECT")
+
+        sql = f"SELECT * FROM {table_name} WHERE {date_column} BETWEEN ? AND ?"
+
+        # Converte datetimes para formato aceito pelo banco
+        params_converted = []
+        for p in (start_dt, end_dt):
+            if isinstance(p, datetime):
+                params_converted.append(p.strftime("%Y%m%d %H:%M:%S"))
+            else:
+                params_converted.append(p)
+
+        try:
+            logger.info("Executing SELECT: %s", sql)
+            logger.info("With params: %s", params_converted)
+        except Exception:
+            pass
+
+        try:
+            with self.connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SET NOCOUNT ON")
+                try:
+                    cursor.execute(sql, params_converted)
+                except Exception as e:
+                    logger.info("Parameterized SELECT failed, retrying with interpolated literals: %s", e)
+                    def _quote_literal(v):
+                        if isinstance(v, datetime):
+                            s = v.strftime("%Y%m%d %H:%M:%S")
+                            return f"'{s}'"
+                        if isinstance(v, str):
+                            return "'" + v.replace("'", "''") + "'"
+                        return str(v)
+
+                    literals = ", ".join(_quote_literal(p) for p in params_converted)
+                    sql_interpolated = f"SELECT * FROM {table_name} WHERE {date_column} BETWEEN {literals.split(',')[0]} AND {literals.split(',')[1]}"
+                    logger.info("Retrying with interpolated SQL: %s", sql_interpolated)
+                    cursor.execute(sql_interpolated)
+
+                description = cursor.description
+                if not description:
+                    logger.info("No result set returned by SELECT %s", table_name)
+                    return pd.DataFrame()
+
+                columns = [col[0] for col in description]
+                rows = cursor.fetchall()
+                try:
+                    logger.info("Rows fetched: %d", len(rows))
+                except Exception:
+                    pass
+
+                df = pd.DataFrame.from_records(rows, columns=columns)
+                return df
+        except pyodbc.Error as e:
+            logger.error("pyodbc error executing SELECT %s with params %s: %s", table_name, params_converted, e)
+            raise Exception(f"Erro ao executar SELECT {table_name}: {e}")
+        except Exception as e:
+            logger.error("General error executing SELECT %s with params %s: %s", table_name, params_converted, e)
+            raise Exception(f"Erro geral ao executar SELECT {table_name}: {e}")

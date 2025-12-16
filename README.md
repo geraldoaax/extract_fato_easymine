@@ -1,13 +1,25 @@
-# SQL Procedure Executor
+# Extrator de Dados Fato - SQL Server
 
-Uma aplicação Python para executar procedures do SQL Server dividindo automaticamente o período em meses para não sobrecarregar o banco de dados, exportando cada resultado para arquivos Excel.
+Uma aplicação Python para extrair dados de tabelas do schema `fato` no SQL Server, dividindo automaticamente o período em meses para não sobrecarregar o banco de dados, exportando cada resultado para arquivos Excel.
+
+## Funcionamento
+
+O sistema realiza **consultas SELECT diretas** nas tabelas do schema `fato`, aplicando filtros de data no formato:
+
+```sql
+SELECT * FROM fato.<tabela> WHERE <coluna_data> BETWEEN 'YYYYMMDD 00:00:00' AND 'YYYYMMDD 23:59:59'
+```
+
+**Não são executadas procedures (stored procedures)** - o sistema consulta as tabelas diretamente. As datas são automaticamente ajustadas para:
+- **Data inicial**: `00:00:00` (início do dia)
+- **Data final**: `23:59:59` (fim do dia)
 
 ## Estrutura do Projeto
 
 ```
-sql_procedure_executor/
+extract_fato_easymine/
 ├── .env.example              # Exemplo de configuração de ambiente
-├── config/procedures.yaml    # Configuração das procedures
+├── config/procedures.yaml    # Configuração das tabelas/queries
 ├── src/
 │   ├── __init__.py          # Inicialização do pacote
 │   ├── database.py          # Conexão com banco de dados
@@ -21,12 +33,13 @@ sql_procedure_executor/
 
 ## Funcionalidades
 
+- **Consulta direta em tabelas**: Executa SELECT nas tabelas do schema `fato` sem usar stored procedures
 - **Divisão automática de períodos**: Divide automaticamente o período em intervalos mensais
 - **Exportação para Excel**: Exporta os resultados de cada período para arquivos Excel separados
-- **Configuração YAML**: Configuração flexível das procedures através de arquivo YAML
+- **Configuração YAML**: Configuração flexível das tabelas através de arquivo YAML
 - **CLI completa**: Interface de linha de comando com todas as opções necessárias
-- **Gerenciamento de parâmetros**: Suporte a parâmetros de diferentes tipos (datetime, int, string)
-- **Valores padrão**: Suporte a valores padrão para parâmetros opcionais
+- **Horários padronizados**: Data inicial com `00:00:00` e data final com `23:59:59`
+- **Coluna de data configurável**: Permite especificar qual coluna usar no filtro WHERE (padrão: `Data`)
 
 ## Instalação
 
@@ -94,42 +107,49 @@ DB_DRIVER=ODBC Driver 17 for SQL Server
 DB_TRUST_CERT=yes
 ```
 
-### 2. Procedures (config/procedures.yaml)
+### 2. Tabelas (config/procedures.yaml)
 
-Configure as procedures no arquivo `config/procedures.yaml`:
+Configure as tabelas no arquivo `config/procedures.yaml`:
 
 ```yaml
 procedures:
-  - name: fato.ciclodetalhado
+  - name: fato.prQDataCicloDetalhado
     output_folder: ciclo_detalhado
-    params:
-      - name: data_inicial
+    table: fato.prQDataCicloDetalhado  # Tabela a ser consultada
+    date_column: Data                   # Coluna de data para filtro (padrão: 'Data')
+    params:                            # Mantido para compatibilidade
+      - name: DataInicial
         type: datetime
         position: 1
-      - name: data_final
+      - name: DataFinal
         type: datetime
         position: 2
 
-  - name: fato.outra_procedure
-    output_folder: outra_procedure
+  - name: fato.prQDataApropriacoes
+    output_folder: apropriacoes
+    table: fato.prQDataApropriacoes
+    date_column: DT1                    # Usando coluna DT1 para filtro
     params:
-      - name: data_inicial
+      - name: DT1
         type: datetime
         position: 1
-      - name: data_final
+      - name: DT2
         type: datetime
         position: 2
-      - name: id_empresa
-        type: int
-        position: 3
-        default: 1
 ```
+
+**Campos de configuração:**
+- `name`: Identificador da configuração
+- `output_folder`: Pasta onde os arquivos Excel serão salvos
+- `table`: Nome da tabela a ser consultada (se omitido, usa o valor de `name`)
+- `date_column`: Nome da coluna de data para o filtro WHERE (padrão: `Data`)
+- `params`: Mantido para compatibilidade, mas não é mais usado para executar procedures
 
 ## Uso
 
 ### Comandos Básicos
 
-Listar procedures disponíveis:
+Listar tabelas configuradas:
 ```bash
 python main.py --list
 ```
@@ -139,30 +159,25 @@ Testar conexão com o banco:
 python main.py --test
 ```
 
-### Executar Procedures
+### Extrair Dados das Tabelas
 
-Executar procedure sem parâmetros adicionais:
+Extrair dados de uma tabela:
 ```bash
-python main.py -p fato.ciclodetalhado -s 20250101 -e 20251031
+python main.py -p fato.prQDataCicloDetalhado -s 20250101 -e 20251031
 ```
 
-Executar procedure com parâmetros adicionais:
+Extrair com período mais longo (será dividido em meses automaticamente):
 ```bash
-python main.py -p fato.outra_procedure -s 20250101 -e 20251031 -P id_empresa=5
-```
-
-Executar com múltiplos parâmetros adicionais:
-```bash
-python main.py -p fato.outra_procedure -s 20250101 -e 20251031 -P id_empresa=5 tipo=ANALISE
+python main.py -p fato.prQDataApropriacoes -s 20250101 -e 20251231
 ```
 
 ### Parâmetros da CLI
 
-- `-p, --procedure`: Nome da procedure a ser executada
-- `-s, --start`: Data inicial no formato YYYYMMDD
-- `-e, --end`: Data final no formato YYYYMMDD
-- `-P, --params`: Parâmetros adicionais no formato key=value (pode ser usado múltiplas vezes)
-- `--list`: Lista todas as procedures configuradas
+- `-p, --procedure`: Nome/identificador da tabela configurada (ex: `fato.prQDataCicloDetalhado`)
+- `-s, --start`: Data inicial no formato YYYYMMDD (será ajustada para 00:00:00)
+- `-e, --end`: Data final no formato YYYYMMDD (será ajustada para 23:59:59)
+- `-P, --params`: Parâmetros adicionais (mantido para compatibilidade)
+- `--list`: Lista todas as tabelas configuradas
 - `--test`: Testa a conexão com o banco de dados
 
 ## Saída
@@ -184,36 +199,43 @@ output/
 ## Exemplo de Execução
 
 ```bash
-$ python main.py -p fato.ciclodetalhado -s 20250101 -e 20250331
+$ python main.py -p fato.prQDataCicloDetalhado -s 20250101 -e 20250331
 
-Executando procedure 'fato.ciclodetalhado' para 3 período(s) mensal(is)
-Executando período 1/3: 01/01/2025 a 31/01/2025
-Arquivo gerado com sucesso: output/ciclo_detalhado/fato.ciclodetalhado_202501.xlsx
+Executando extração de 'fato.prQDataCicloDetalhado' para 3 período(s) mensal(is)
+Executando período 1/3: 01/01/2025 00:00:00 a 31/01/2025 23:59:59
+  SELECT * FROM fato.prQDataCicloDetalhado WHERE Data BETWEEN '20250101 00:00:00' AND '20250131 23:59:59'
+Arquivo gerado com sucesso: output/ciclo_detalhado/fato.prQDataCicloDetalhado_202501.xlsx
   1250 registros exportados
-Executando período 2/3: 01/02/2025 a 28/02/2025
-Arquivo gerado com sucesso: output/ciclo_detalhado/fato.ciclodetalhado_202502.xlsx
+Executando período 2/3: 01/02/2025 00:00:00 a 28/02/2025 23:59:59
+  SELECT * FROM fato.prQDataCicloDetalhado WHERE Data BETWEEN '20250201 00:00:00' AND '20250228 23:59:59'
+Arquivo gerado com sucesso: output/ciclo_detalhado/fato.prQDataCicloDetalhado_202502.xlsx
   980 registros exportados
-Executando período 3/3: 01/03/2025 a 31/03/2025
-Arquivo gerado com sucesso: output/ciclo_detalhado/fato.ciclodetalhado_202503.xlsx
+Executando período 3/3: 01/03/2025 00:00:00 a 31/03/2025 23:59:59
+  SELECT * FROM fato.prQDataCicloDetalhado WHERE Data BETWEEN '20250301 00:00:00' AND '20250331 23:59:59'
+Arquivo gerado com sucesso: output/ciclo_detalhado/fato.prQDataCicloDetalhado_202503.xlsx
   1430 registros exportados
 
 Execução concluída. 3 arquivo(s) gerado(s)
 
 Arquivos gerados:
-  - output/ciclo_detalhado/fato.ciclodetalhado_202501.xlsx
-  - output/ciclo_detalhado/fato.ciclodetalhado_202502.xlsx
-  - output/ciclo_detalhado/fato.ciclodetalhado_202503.xlsx
+  - output/ciclo_detalhado/fato.prQDataCicloDetalhado_202501.xlsx
+  - output/ciclo_detalhado/fato.prQDataCicloDetalhado_202502.xlsx
+  - output/ciclo_detalhado/fato.prQDataCicloDetalhado_202503.xlsx
 ```
 
-## Procedures Disponíveis
+## Tabelas Disponíveis
 
 ### 1. fato.prQDataCicloDetalhado
 
-Extrai dados de ciclo detalhado.
+Tabela com dados detalhados de ciclos de equipamentos.
 
-**Parâmetros:**
-- `@DataInicial` (datetime): Data inicial **[OBRIGATÓRIO]**
-- `@DataFinal` (datetime): Data final **[OBRIGATÓRIO]**
+**Query executada:**
+```sql
+SELECT * FROM fato.prQDataCicloDetalhado 
+WHERE Data BETWEEN '20250101 00:00:00' AND '20251130 23:59:59'
+```
+
+**Coluna de data:** `Data`
 
 **Exemplo de uso:**
 ```bash
@@ -226,37 +248,19 @@ python main.py -p fato.prQDataCicloDetalhado -s 20250101 -e 20251130
 
 ### 2. fato.prQDataCicloDetalhadoLatLon
 
-Extrai dados de ciclo detalhado com coordenadas de latitude e longitude.
+Tabela com dados de ciclo detalhado incluindo coordenadas de latitude e longitude.
 
-**Parâmetros:**
-- `@dataInicial` (datetime): Data inicial **[OBRIGATÓRIO]**
-- `@dataFinal` (datetime): Data final **[OBRIGATÓRIO]**
-- `@equipamentoSetorID` (nvarchar): ID do setor do equipamento (padrão: '-1')
-- `@equipamentoClassificacaoID` (nvarchar): ID da classificação do equipamento (padrão: '-1')
-- `@equipamentoID` (nvarchar): ID do equipamento (padrão: '-1')
-- `@tipoAtividadeID` (nvarchar): ID do tipo de atividade (padrão: '-1')
-- `@especMaterialID` (nvarchar): ID da especificação do material (padrão: '-1')
-- `@materialID` (nvarchar): ID do material (padrão: '-1')
-- `@origemID` (nvarchar): ID da origem (padrão: '-1')
-- `@destinoID` (nvarchar): ID do destino (padrão: '-1')
-- `@dmtCheioInicial` (int): DMT cheio inicial (padrão: -1)
-- `@dmtCheioFinal` (int): DMT cheio final (padrão: -1)
-- `@proprietarioID` (nvarchar): ID do proprietário (padrão: '-1')
-- `@turnoID` (nvarchar): ID do turno (padrão: '-1')
-- `@turmaID` (nvarchar): ID da turma (padrão: '-1')
-- `@equipamentoCargaID` (nvarchar): ID do equipamento de carga (padrão: '-1')
-- `@operadorID` (nvarchar): ID do operador (padrão: '-1')
-- `@frotaTransporteID` (nvarchar): ID da frota de transporte (padrão: '-1')
-- `@cicloID` (varchar): ID do ciclo (padrão: '-1')
+**Query executada:**
+```sql
+SELECT * FROM fato.prQDataCicloDetalhadoLatLon 
+WHERE Data BETWEEN '20250101 00:00:00' AND '20251130 23:59:59'
+```
+
+**Coluna de data:** `Data`
 
 **Exemplo de uso:**
 ```bash
 python main.py -p fato.prQDataCicloDetalhadoLatLon -s 20250101 -e 20251130
-```
-
-**Exemplo com filtros:**
-```bash
-python main.py -p fato.prQDataCicloDetalhadoLatLon -s 20250101 -e 20251130 -P equipamentoID=5 -P turnoID=1
 ```
 
 **Saída:** `output/ciclo_detalhado_latlon/`
@@ -265,33 +269,19 @@ python main.py -p fato.prQDataCicloDetalhadoLatLon -s 20250101 -e 20251130 -P eq
 
 ### 3. fato.prQDataApropriacoes
 
-Extrai dados de apropriações com múltiplos filtros.
+Tabela com dados de apropriações de equipamentos e atividades.
 
-**Parâmetros:**
-- `@DT1` (datetime): Data inicial **[OBRIGATÓRIO]**
-- `@DT2` (datetime): Data final **[OBRIGATÓRIO]**
-- `@TPR` (varchar): Tipo de produção **[OBRIGATÓRIO]** (ex: 'PRODUCAO')
-- `@CLASSIFICACAO` (nvarchar): Classificação (padrão: '-1')
-- `@SETORID` (nvarchar): ID do setor (padrão: '-1')
-- `@USUARIOID` (int): ID do usuário (padrão: 2115)
-- `@proprietarioID` (nvarchar): ID do proprietário (padrão: '-1')
-- `@turnoID` (nvarchar): ID do turno (padrão: '-1')
-- `@turmaID` (nvarchar): ID da turma (padrão: '-1')
-- `@operadorID` (nvarchar): ID do operador (padrão: '-1')
-- `@frotaTransporteID` (nvarchar): ID da frota de transporte (padrão: '-1')
-- `@equipamentoID` (nvarchar): ID do equipamento (padrão: '-1')
-
-**Exemplo de uso (mínimo - apenas parâmetros obrigatórios):**
-```bash
-python main.py -p fato.prQDataApropriacoes -s 20250101 -e 20251130 -P TPR=PRODUCAO
+**Query executada:**
+```sql
+SELECT * FROM fato.prQDataApropriacoes 
+WHERE Data BETWEEN '20250101 00:00:00' AND '20251130 23:59:59'
 ```
 
-**Exemplo de uso (com parâmetros personalizados):**
+**Coluna de data:** `Data` (ou configure `DT1` no YAML se necessário)
+
+**Exemplo de uso:**
 ```bash
-python main.py -p fato.prQDataApropriacoes -s 20250101 -e 20251130 \
-  -P TPR=PRODUCAO \
-  -P USUARIOID=2115 \
-  -P SETORID=5
+python main.py -p fato.prQDataApropriacoes -s 20250101 -e 20251130
 ```
 
 **Saída:** `output/apropriacoes/`
@@ -306,8 +296,9 @@ python main.py -p fato.prQDataApropriacoes -s 20250101 -e 20251130 \
 
 ## Notas
 
-- A aplicação divide automaticamente o período em intervalos mensais para evitar sobrecarga
-- Cada mês gera um arquivo Excel separado
-- Parâmetros do tipo datetime são automaticamente identificados e substituídos pelos períodos mensais
-- Parâmetros com valores padrão são automaticamente preenchidos se não fornecidos
-- A aplicação valida a conexão com o banco antes de executar as procedures
+- **Não executa procedures**: O sistema faz SELECT direto nas tabelas `fato.*`
+- **Divisão mensal**: Períodos longos são divididos automaticamente em intervalos mensais para evitar sobrecarga
+- **Horários fixos**: Data inicial sempre em `00:00:00` e data final em `23:59:59`
+- **Coluna de data configurável**: Use `date_column` no YAML para especificar a coluna de filtro
+- **Validação de conexão**: A aplicação testa a conexão com o banco antes de extrair dados
+- **Um arquivo por mês**: Cada período mensal gera um arquivo Excel separado
