@@ -65,6 +65,8 @@ Para desativar o ambiente:
 deactivate
 ```
 
+> **⚠️ IMPORTANTE**: Certifique-se de que o ambiente virtual está ativado antes de instalar as dependências. Você deve ver `(.venv)` no início da linha de comando.
+
 3. Instale as dependências:
 ```bash
 pip install -r requirements.txt

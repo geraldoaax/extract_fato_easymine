@@ -1,12 +1,17 @@
-import pyodbc
-import pandas as pd
-from typing import Any, Dict, List, Optional
-from contextlib import contextmanager
+import logging
 import os
+from contextlib import contextmanager
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+import pyodbc
 from dotenv import load_dotenv
 
 # Carregar variáveis de ambiente
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 class DatabaseConnection:
@@ -21,6 +26,7 @@ class DatabaseConnection:
         self.password = os.getenv("DB_PASSWORD")
         self.driver = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
         self.trust_cert = os.getenv("DB_TRUST_CERT", "yes").lower() == "yes"
+        self.encrypt = os.getenv("DB_ENCRYPT", "no").lower()
 
         if not all([self.server, self.database, self.username, self.password]):
             raise ValueError(
@@ -40,7 +46,8 @@ class DatabaseConnection:
             f"DATABASE={self.database};"
             f"UID={self.username};"
             f"PWD={self.password};"
-            f"TrustServerCertificate={'yes' if self.trust_cert else 'no'}"
+            f"TrustServerCertificate={'yes' if self.trust_cert else 'no'};"
+            f"Encrypt={self.encrypt}"
         )
         return conn_str
 
@@ -69,33 +76,102 @@ class DatabaseConnection:
         """
         Executa uma procedure SQL Server e retorna os resultados como DataFrame.
 
-        Args:
-            procedure_name: Nome da procedure a ser executada
-            params: Lista de parâmetros para a procedure (opcional)
+        Esta implementação usa diretamente o cursor do pyodbc para executar a
+        procedure e construir o DataFrame a partir do resultado. Evita problemas
+        de compatibilidade com pandas.read_sql quando se usa uma conexão pyodbc.
 
-        Returns:
-            DataFrame pandas com os resultados da procedure
+        Adiciona logs para inspecionar o SQL executado e os parâmetros enviados.
         """
         if not procedure_name:
             raise ValueError("Nome da procedure é obrigatório")
 
+        # Monta SQL com placeholders "?" quando há parâmetros
         sql = f"EXEC {procedure_name}"
-
-        # Adiciona placeholders para os parâmetros
         if params:
-            param_placeholders = ", ".join(["?" for _ in params])
-            sql += f" {param_placeholders}"
+            placeholders = ", ".join("?" for _ in params)
+            sql = f"{sql} {placeholders}"
+
+        # Convert datetime params to SQL-friendly string format when needed,
+        # because some stored procedures expect date/time as string literals.
+        params_converted = None
+        if params:
+            params_converted = []
+            for p in params:
+                try:
+                    if isinstance(p, datetime):
+                        params_converted.append(p.strftime("%Y%m%d %H:%M:%S"))
+                    else:
+                        params_converted.append(p)
+                except Exception:
+                    params_converted.append(p)
+        else:
+            params_converted = params
+
+        # Log SQL and converted parameters for debugging
+        try:
+            logger.info("Executing SQL: %s", sql)
+            logger.info("With params: %s", params_converted)
+        except Exception:
+            pass
 
         try:
             with self.connection() as conn:
-                if params:
-                    df = pd.read_sql(sql, conn, params=params)
-                else:
-                    df = pd.read_sql(sql, conn)
+                cursor = conn.cursor()
+                # Adiciona SET NOCOUNT ON para evitar mensagens de contagem de linhas
+                cursor.execute("SET NOCOUNT ON")
+                
+                # Use parameterized execution
+                try:
+                    if params_converted:
+                        cursor.execute(sql, params_converted)
+                    else:
+                        cursor.execute(sql)
+                except Exception as e:
+                    logger.info("Parameterized execute failed, will retry using interpolated literals: %s", e)
+                    # If parameterized fails, retry with interpolated literals
+                    if params_converted:
+                        def _quote_literal(v):
+                            if isinstance(v, datetime):
+                                s = v.strftime("%Y%m%d")
+                                return f"'{s}'"
+                            if isinstance(v, str):
+                                return "'" + v.replace("'", "''") + "'"
+                            return str(v)
+
+                        literals = ", ".join(_quote_literal(p) for p in params_converted)
+                        sql_interpolated = f"EXEC {procedure_name} {literals}"
+                        try:
+                            logger.info("Retrying with interpolated SQL: %s", sql_interpolated)
+                            cursor.execute(sql_interpolated)
+                        except Exception as e2:
+                            logger.info("Interpolated execute failed as well: %s", e2)
+                            # Nothing more to try
+                            return pd.DataFrame()
+                    else:
+                        return pd.DataFrame()
+
+                # Tenta obter descrição das colunas; se None => nenhum resultado
+                description = cursor.description
+                if not description:
+                    logger.info("No result set returned by procedure %s for params %s", procedure_name, params_converted)
+                    return pd.DataFrame()
+
+                columns = [col[0] for col in description]
+                rows = cursor.fetchall()
+
+                try:
+                    logger.info("Rows fetched: %d", len(rows))
+                except Exception:
+                    pass
+
+                # Constrói DataFrame a partir dos registros
+                df = pd.DataFrame.from_records(rows, columns=columns)
                 return df
         except pyodbc.Error as e:
+            logger.error("pyodbc error executing %s with params %s: %s", procedure_name, params_converted, e)
             raise Exception(f"Erro ao executar procedure {procedure_name}: {e}")
         except Exception as e:
+            logger.error("General error executing %s with params %s: %s", procedure_name, params_converted, e)
             raise Exception(f"Erro geral ao executar procedure {procedure_name}: {e}")
 
     def test_connection(self) -> bool:

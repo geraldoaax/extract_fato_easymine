@@ -31,9 +31,9 @@ def split_date_range_monthly(start_date: datetime, end_date: datetime) -> List[T
         last_day_of_month = next_month - timedelta(days=1)
 
         # Define o período do mês
-        month_start = max(current_date, start_date)
-        month_end = min(last_day_of_month.replace(hour=23, minute=59, second=59, microsecond=999999),
-                       end_date)
+        month_start = max(current_date, start_date.replace(hour=0, minute=0, second=0, microsecond=0))
+        month_end = min(last_day_of_month.replace(hour=23, minute=59, second=59, microsecond=0),
+                       end_date.replace(hour=23, minute=59, second=59, microsecond=0))
 
         monthly_ranges.append((month_start, month_end))
 

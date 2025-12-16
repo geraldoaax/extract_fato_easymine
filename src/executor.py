@@ -83,48 +83,90 @@ class ProcedureExecutor:
     ) -> List[Any]:
         """
         Prepara os parâmetros para execução da procedure.
-
+    
+        Esta implementação é mais tolerante a diferenças de nome de parâmetro
+        (ex.: DataInicial / data_inicial / DataInicial) e tenta mapear
+        automaticamente os parâmetros do tipo datetime para `date_start` e
+        `date_end` com heurísticas simples. Se houver dois parâmetros datetime
+        sem nomes indicativos, o primeiro datetime será tratado como início e
+        o segundo como fim.
+    
         Args:
             procedure_config: Configuração da procedure
             date_start: Data inicial
             date_end: Data final
             extra_params: Parâmetros adicionais (opcional)
-
+    
         Returns:
             Lista de parâmetros na ordem correta
         """
         params_config = procedure_config.get("params", [])
         params_list = [None] * len(params_config)
-
+    
+        # Contadores/flags para fallback quando nomes não forem explícitos
+        assigned_start = False
+        assigned_end = False
+    
+        # Primeiro passe: tenta mapear datetime por nome (case-insensitive, diferentes formas)
         for param_config in params_config:
             param_name = param_config["name"]
             param_type = param_config["type"]
             position = param_config["position"] - 1  # Converter para índice base 0
-
+            lname = str(param_name).lower()
+    
             if param_type == "datetime":
-                if param_name == "data_inicial":
+                # Heurísticas por nome
+                if any(k in lname for k in ("inicial", "inicio", "start")):
                     params_list[position] = date_start
-                elif param_name == "data_final":
+                    assigned_start = True
+                elif any(k in lname for k in ("final", "fim", "end")):
                     params_list[position] = date_end
+                    assigned_end = True
+    
+        # Segunda passe: preenche restantes (datetimes sem nome indicativo)
+        for param_config in params_config:
+            param_name = param_config["name"]
+            param_type = param_config["type"]
+            position = param_config["position"] - 1
+            lname = str(param_name).lower()
+    
+            if param_type == "datetime" and params_list[position] is None:
+                # Se nenhum dos dois já foi atribuído, atribui start ao primeiro encontrado
+                if not assigned_start:
+                    params_list[position] = date_start
+                    assigned_start = True
+                elif not assigned_end:
+                    params_list[position] = date_end
+                    assigned_end = True
+                else:
+                    # Se já atribuídos ambos, por segurança atribui date_end
+                    params_list[position] = date_end
+    
             elif param_type == "int":
                 # Verifica se há um valor default
                 default_value = param_config.get("default")
-                if extra_params and param_name in extra_params:
-                    params_list[position] = int(extra_params[param_name])
+                pname = param_config["name"]
+                if extra_params and pname in extra_params:
+                    try:
+                        params_list[position] = int(extra_params[pname])
+                    except Exception:
+                        raise ValueError(f"Parâmetro '{pname}' do tipo int inválido")
                 elif default_value is not None:
                     params_list[position] = default_value
                 else:
-                    raise ValueError(f"Parâmetro '{param_name}' do tipo int não fornecido")
+                    raise ValueError(f"Parâmetro '{pname}' do tipo int não fornecido")
+    
             else:
-                if extra_params and param_name in extra_params:
-                    params_list[position] = extra_params[param_name]
+                pname = param_config["name"]
+                if extra_params and pname in extra_params:
+                    params_list[position] = extra_params[pname]
                 elif param_config.get("default") is not None:
                     params_list[position] = param_config["default"]
-
+    
         # Valida se todos os parâmetros foram preenchidos
         if any(param is None for param in params_list):
             raise ValueError("Não foi possível preencher todos os parâmetros necessários")
-
+    
         return params_list
 
     def execute_procedure(
