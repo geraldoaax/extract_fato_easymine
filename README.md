@@ -224,7 +224,46 @@ python main.py -p fato.prQDataCicloDetalhado -s 20250101 -e 20251130
 
 ---
 
-### 2. fato.prQDataApropriacoes
+### 2. fato.prQDataCicloDetalhadoLatLon
+
+Extrai dados de ciclo detalhado com coordenadas de latitude e longitude.
+
+**Parâmetros:**
+- `@dataInicial` (datetime): Data inicial **[OBRIGATÓRIO]**
+- `@dataFinal` (datetime): Data final **[OBRIGATÓRIO]**
+- `@equipamentoSetorID` (nvarchar): ID do setor do equipamento (padrão: '-1')
+- `@equipamentoClassificacaoID` (nvarchar): ID da classificação do equipamento (padrão: '-1')
+- `@equipamentoID` (nvarchar): ID do equipamento (padrão: '-1')
+- `@tipoAtividadeID` (nvarchar): ID do tipo de atividade (padrão: '-1')
+- `@especMaterialID` (nvarchar): ID da especificação do material (padrão: '-1')
+- `@materialID` (nvarchar): ID do material (padrão: '-1')
+- `@origemID` (nvarchar): ID da origem (padrão: '-1')
+- `@destinoID` (nvarchar): ID do destino (padrão: '-1')
+- `@dmtCheioInicial` (int): DMT cheio inicial (padrão: -1)
+- `@dmtCheioFinal` (int): DMT cheio final (padrão: -1)
+- `@proprietarioID` (nvarchar): ID do proprietário (padrão: '-1')
+- `@turnoID` (nvarchar): ID do turno (padrão: '-1')
+- `@turmaID` (nvarchar): ID da turma (padrão: '-1')
+- `@equipamentoCargaID` (nvarchar): ID do equipamento de carga (padrão: '-1')
+- `@operadorID` (nvarchar): ID do operador (padrão: '-1')
+- `@frotaTransporteID` (nvarchar): ID da frota de transporte (padrão: '-1')
+- `@cicloID` (varchar): ID do ciclo (padrão: '-1')
+
+**Exemplo de uso:**
+```bash
+python main.py -p fato.prQDataCicloDetalhadoLatLon -s 20250101 -e 20251130
+```
+
+**Exemplo com filtros:**
+```bash
+python main.py -p fato.prQDataCicloDetalhadoLatLon -s 20250101 -e 20251130 -P equipamentoID=5 -P turnoID=1
+```
+
+**Saída:** `output/ciclo_detalhado_latlon/`
+
+---
+
+### 3. fato.prQDataApropriacoes
 
 Extrai dados de apropriações com múltiplos filtros.
 

@@ -8,6 +8,15 @@ procedures:
       - name: DataFinal
         type: datetime
         position: 2
+  - name: fato.prQDataCicloDetalhadoLatLon
+    output_folder: ciclo_detalhado_latlon
+    params:
+      - name: dataInicial
+        type: datetime
+        position: 1
+      - name: dataFinal
+        type: datetime
+        position: 2
   - name: fato.prQDataApropriacoes
     output_folder: apropriacoes
     params:
