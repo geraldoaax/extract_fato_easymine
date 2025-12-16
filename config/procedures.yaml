@@ -65,6 +65,8 @@ procedures:
         default: '-1'
   - name: fato.prQDataApropriacoes
     output_folder: apropriacoes
+    table: fato.Apropriacoes
+    date_column: datahorainicio
     params:
       - name: DT1
         type: datetime
