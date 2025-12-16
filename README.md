@@ -115,9 +115,9 @@ Configure as tabelas no arquivo `config/procedures.yaml`:
 procedures:
   - name: fato.prQDataCicloDetalhado
     output_folder: ciclo_detalhado
-    table: fato.prQDataCicloDetalhado  # Tabela a ser consultada
-    date_column: Data                   # Coluna de data para filtro (padrão: 'Data')
-    params:                            # Mantido para compatibilidade
+    table: fato.CicloDetalhado          # Tabela a ser consultada
+    date_column: datahorainicio          # Coluna de data para filtro
+    params:                             # Mantido para compatibilidade
       - name: DataInicial
         type: datetime
         position: 1
@@ -125,10 +125,34 @@ procedures:
         type: datetime
         position: 2
 
+  - name: fato.prQDataCicloDetalhadoLatLon
+    output_folder: ciclo_detalhado_latlon
+    table: fato.CicloDetalhadoLatLon
+    date_column: datahorainicio
+    params:
+      - name: dataInicial
+        type: datetime
+        position: 1
+      - name: dataFinal
+        type: datetime
+        position: 2
+
+  - name: fato.prQDataIndicesOperacionais
+    output_folder: indices_operacionais
+    table: fato.IndicesOperacionais
+    date_column: data                    # Usando coluna 'data' para filtro
+    params:
+      - name: dataInicial
+        type: datetime
+        position: 1
+      - name: dataFinal
+        type: datetime
+        position: 2
+
   - name: fato.prQDataApropriacoes
     output_folder: apropriacoes
-    table: fato.prQDataApropriacoes
-    date_column: DT1                    # Usando coluna DT1 para filtro
+    table: fato.Apropriacoes
+    date_column: datahorainicio          # Usando coluna datahorainicio para filtro
     params:
       - name: DT1
         type: datetime
@@ -163,7 +187,7 @@ python main.py --test
 
 Extrair dados de uma tabela:
 ```bash
-python main.py -p fato.prQDataCicloDetalhado -s 20250101 -e 20251031
+python main.py -p fato.prQDataCicloDetalhado -s 20250101 -e 20251130
 ```
 
 Extrair com período mais longo (será dividido em meses automaticamente):
@@ -203,15 +227,15 @@ $ python main.py -p fato.prQDataCicloDetalhado -s 20250101 -e 20250331
 
 Executando extração de 'fato.prQDataCicloDetalhado' para 3 período(s) mensal(is)
 Executando período 1/3: 01/01/2025 00:00:00 a 31/01/2025 23:59:59
-  SELECT * FROM fato.prQDataCicloDetalhado WHERE Data BETWEEN '20250101 00:00:00' AND '20250131 23:59:59'
+  SELECT * FROM fato.CicloDetalhado WHERE datahorainicio BETWEEN '20250101 00:00:00' AND '20250131 23:59:59'
 Arquivo gerado com sucesso: output/ciclo_detalhado/fato.prQDataCicloDetalhado_202501.xlsx
   1250 registros exportados
 Executando período 2/3: 01/02/2025 00:00:00 a 28/02/2025 23:59:59
-  SELECT * FROM fato.prQDataCicloDetalhado WHERE Data BETWEEN '20250201 00:00:00' AND '20250228 23:59:59'
+  SELECT * FROM fato.CicloDetalhado WHERE datahorainicio BETWEEN '20250201 00:00:00' AND '20250228 23:59:59'
 Arquivo gerado com sucesso: output/ciclo_detalhado/fato.prQDataCicloDetalhado_202502.xlsx
   980 registros exportados
 Executando período 3/3: 01/03/2025 00:00:00 a 31/03/2025 23:59:59
-  SELECT * FROM fato.prQDataCicloDetalhado WHERE Data BETWEEN '20250301 00:00:00' AND '20250331 23:59:59'
+  SELECT * FROM fato.CicloDetalhado WHERE datahorainicio BETWEEN '20250301 00:00:00' AND '20250331 23:59:59'
 Arquivo gerado com sucesso: output/ciclo_detalhado/fato.prQDataCicloDetalhado_202503.xlsx
   1430 registros exportados
 
@@ -231,11 +255,11 @@ Tabela com dados detalhados de ciclos de equipamentos.
 
 **Query executada:**
 ```sql
-SELECT * FROM fato.prQDataCicloDetalhado 
-WHERE Data BETWEEN '20250101 00:00:00' AND '20251130 23:59:59'
+SELECT * FROM fato.CicloDetalhado 
+WHERE datahorainicio BETWEEN '20250101 00:00:00' AND '20251130 23:59:59'
 ```
 
-**Coluna de data:** `Data`
+**Coluna de data:** `datahorainicio`
 
 **Exemplo de uso:**
 ```bash
@@ -252,11 +276,11 @@ Tabela com dados de ciclo detalhado incluindo coordenadas de latitude e longitud
 
 **Query executada:**
 ```sql
-SELECT * FROM fato.prQDataCicloDetalhadoLatLon 
-WHERE Data BETWEEN '20250101 00:00:00' AND '20251130 23:59:59'
+SELECT * FROM fato.CicloDetalhadoLatLon 
+WHERE datahorainicio BETWEEN '20250101 00:00:00' AND '20251130 23:59:59'
 ```
 
-**Coluna de data:** `Data`
+**Coluna de data:** `datahorainicio`
 
 **Exemplo de uso:**
 ```bash
@@ -267,17 +291,38 @@ python main.py -p fato.prQDataCicloDetalhadoLatLon -s 20250101 -e 20251130
 
 ---
 
-### 3. fato.prQDataApropriacoes
+### 3. fato.prQDataIndicesOperacionais
+
+Tabela com índices operacionais de equipamentos.
+
+**Query executada:**
+```sql
+SELECT * FROM fato.IndicesOperacionais 
+WHERE data BETWEEN '20250101 00:00:00' AND '20251130 23:59:59'
+```
+
+**Coluna de data:** `data`
+
+**Exemplo de uso:**
+```bash
+python main.py -p fato.prQDataIndicesOperacionais -s 20250101 -e 20251130
+```
+
+**Saída:** `output/indices_operacionais/`
+
+---
+
+### 4. fato.prQDataApropriacoes
 
 Tabela com dados de apropriações de equipamentos e atividades.
 
 **Query executada:**
 ```sql
-SELECT * FROM fato.prQDataApropriacoes 
-WHERE Data BETWEEN '20250101 00:00:00' AND '20251130 23:59:59'
+SELECT * FROM fato.Apropriacoes 
+WHERE datahorainicio BETWEEN '20250101 00:00:00' AND '20251130 23:59:59'
 ```
 
-**Coluna de data:** `Data` (ou configure `DT1` no YAML se necessário)
+**Coluna de data:** `datahorainicio`
 
 **Exemplo de uso:**
 ```bash
