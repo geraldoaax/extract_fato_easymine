@@ -23,6 +23,8 @@ procedures:
         position: 2
   - name: fato.prQDataIndicesOperacionais
     output_folder: indices_operacionais
+    table: fato.IndicesOperacionais
+    date_column: data
     params:
       - name: dataInicial
         type: datetime
