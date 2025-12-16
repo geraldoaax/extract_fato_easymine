@@ -205,6 +205,58 @@ Arquivos gerados:
   - output/ciclo_detalhado/fato.ciclodetalhado_202503.xlsx
 ```
 
+## Procedures Disponíveis
+
+### 1. fato.prQDataCicloDetalhado
+
+Extrai dados de ciclo detalhado.
+
+**Parâmetros:**
+- `@DataInicial` (datetime): Data inicial **[OBRIGATÓRIO]**
+- `@DataFinal` (datetime): Data final **[OBRIGATÓRIO]**
+
+**Exemplo de uso:**
+```bash
+python main.py -p fato.prQDataCicloDetalhado -s 20250101 -e 20251130
+```
+
+**Saída:** `output/ciclo_detalhado/`
+
+---
+
+### 2. fato.prQDataApropriacoes
+
+Extrai dados de apropriações com múltiplos filtros.
+
+**Parâmetros:**
+- `@DT1` (datetime): Data inicial **[OBRIGATÓRIO]**
+- `@DT2` (datetime): Data final **[OBRIGATÓRIO]**
+- `@TPR` (varchar): Tipo de produção **[OBRIGATÓRIO]** (ex: 'PRODUCAO')
+- `@CLASSIFICACAO` (nvarchar): Classificação (padrão: '-1')
+- `@SETORID` (nvarchar): ID do setor (padrão: '-1')
+- `@USUARIOID` (int): ID do usuário (padrão: 2115)
+- `@proprietarioID` (nvarchar): ID do proprietário (padrão: '-1')
+- `@turnoID` (nvarchar): ID do turno (padrão: '-1')
+- `@turmaID` (nvarchar): ID da turma (padrão: '-1')
+- `@operadorID` (nvarchar): ID do operador (padrão: '-1')
+- `@frotaTransporteID` (nvarchar): ID da frota de transporte (padrão: '-1')
+- `@equipamentoID` (nvarchar): ID do equipamento (padrão: '-1')
+
+**Exemplo de uso (mínimo - apenas parâmetros obrigatórios):**
+```bash
+python main.py -p fato.prQDataApropriacoes -s 20250101 -e 20251130 -P TPR=PRODUCAO
+```
+
+**Exemplo de uso (com parâmetros personalizados):**
+```bash
+python main.py -p fato.prQDataApropriacoes -s 20250101 -e 20251130 \
+  -P TPR=PRODUCAO \
+  -P USUARIOID=2115 \
+  -P SETORID=5
+```
+
+**Saída:** `output/apropriacoes/`
+
 ## Dependências
 
 - `pyodbc`: Driver ODBC para SQL Server
@@ -217,6 +269,6 @@ Arquivos gerados:
 
 - A aplicação divide automaticamente o período em intervalos mensais para evitar sobrecarga
 - Cada mês gera um arquivo Excel separado
-- Parâmetros do tipo datetime são automaticamente identificados e substituídos pelos perípos mensais
+- Parâmetros do tipo datetime são automaticamente identificados e substituídos pelos períodos mensais
 - Parâmetros com valores padrão são automaticamente preenchidos se não fornecidos
 - A aplicação valida a conexão com o banco antes de executar as procedures
